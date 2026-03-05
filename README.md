@@ -1,6 +1,12 @@
 [Vibe_Coding_Accelerated.pdf](https://github.com/user-attachments/files/25770738/Vibe_Coding_Accelerated.pdf)
 
+
+■作成している画面
 <img width="1919" height="1079" alt="image" src="https://github.com/user-attachments/assets/c2153d3a-251e-47a3-9a27-84234692d9d3" />
+■NBLM
+<img width="1919" height="1079" alt="image" src="https://github.com/user-attachments/assets/2a7bb0bc-7412-4780-9743-3d1df83acf0a" />
+
+
 ■中期（2026/1/26）
 <img width="1279" height="724" alt="image" src="https://github.com/user-attachments/assets/e0cfcafa-f7fa-4b73-a3e8-378fa6acef0a" />
 ■最初期（2026/1/11）
