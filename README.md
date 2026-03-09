@@ -1,5 +1,6 @@
 ■全体フロー（簡易版）
-<img width="1889" height="3502" alt="全体フロー（簡素版）" src="https://github.com/user-attachments/assets/185a1fbf-057a-4f5a-9c82-5e91289314f2" />
+<img width="1889" height="3502" alt="全体フロー（簡素版）" src="https://github.com/user-attachments/assets/7117e702-ef55-4d97-a6d9-fbc0a5fafbea" />
+
 ■全体フロー（詳細版）
 <img width="2103" height="12118" alt="全体フロー（詳細版）" src="https://github.com/user-attachments/assets/2c223d1c-6168-48b2-8a88-272d82ca29d2" />
 
