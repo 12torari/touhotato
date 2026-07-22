@@ -1,8 +1,11 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ja">
 	<head>
 		<meta charset="utf-8">
-		<meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1.0">
+		<!-- viewport-fit=cover: iPhoneのノッチ/ホームインジケータ領域までcanvasを広げる
+		     (safe-area は縦画面案内オーバーレイ側で env() 考慮)。
+		     user-scalable=no + touch-action:none でピンチズームによるゲーム誤操作を防ぐ。 -->
+		<meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1.0, viewport-fit=cover">
 		<title>touhotato</title>
 		<style>
 html, body, #canvas {
@@ -13,13 +16,28 @@ html, body, #canvas {
 
 body {
 	color: white;
-	background-color: black;
+	/* letterbox/背景色はゲームの boot_splash/bg_color=Color(0.04,0.03,0.07) と統一 */
+	background-color: #0A0812;
 	overflow: hidden;
+	/* スクロール/オーバースクロール/ダブルタップズームをゲーム領域で無効化 */
 	touch-action: none;
+	overscroll-behavior: none;
+	/* iOS Safari のアドレスバー伸縮でも全面を維持 */
+	position: fixed;
+	inset: 0;
+	width: 100%;
+	height: 100%;
 }
 
 #canvas {
 	display: block;
+	/* ゲームcanvas上のタッチをブラウザ既定動作(スクロール等)へ渡さない */
+	touch-action: none;
+	/* 長押しメニュー/テキスト選択の抑制はゲーム領域(canvas)に限定する
+	   (ページ全体のアクセシビリティを不必要に壊さない) */
+	-webkit-user-select: none;
+	user-select: none;
+	-webkit-touch-callout: none;
 }
 
 #canvas:focus {
@@ -38,7 +56,10 @@ body {
 }
 
 #status {
-	background-color: #242424;
+	background-color: #0a0812;
+	/* rotate-overlay(z-index:10)より前面に置く: portrait中でもロード進捗と
+	   エラー通知が隠れず読める(2026-07-19 静的監査是正)。 */
+	z-index: 11;
 	display: flex;
 	flex-direction: column;
 	justify-content: center;
@@ -89,6 +110,60 @@ body {
 	text-align: center;
 	z-index: 1;
 }
+
+/* --- safe-area 計測プローブ (2026-07-19 Codex監査是正・確定バグ4) ---
+   env(safe-area-inset-*) の実値(CSS px)を padding として持つ不可視要素。
+   ゲーム側(mobile_input_controller.gd)が JavaScriptBridge で computedStyle を
+   読み、戦闘ボタンの配置へ反映する。表示・入力へは一切関与しない。 */
+#safe-area-probe {
+	position: fixed;
+	visibility: hidden;
+	pointer-events: none;
+	width: 0;
+	height: 0;
+	padding-top: env(safe-area-inset-top, 0px);
+	padding-right: env(safe-area-inset-right, 0px);
+	padding-bottom: env(safe-area-inset-bottom, 0px);
+	padding-left: env(safe-area-inset-left, 0px);
+}
+
+/* --- 縦画面案内オーバーレイ (2026-07-18 スマホWeb対応 / 2026-07-19 是正) ---
+   タイトルを含む全シーンで、縦向き(portrait)のときだけ表示する。
+   2026-07-19: pointer-events:auto で portrait 中は背後のゲーム入力を遮断する
+   (安全側採用: 縦向きのまま背後のメニュー/戦闘が誤操作されない)。
+   landscape では display:none となり入力へ一切関与しない。音声開始の初回
+   gesture は「横向きに直した後の最初の操作」が canvas に届いて成立する
+   (portrait 中の gesture で開始できない点は仕様上のトレードオフ)。
+   orientation lock の成功は前提にしない(CSS media query のみで判定)。 */
+#rotate-overlay {
+	display: none;
+	position: fixed;
+	inset: 0;
+	z-index: 10;
+	background-color: rgba(10, 8, 18, 0.92);
+	color: #e0e0e0;
+	font-family: 'Noto Sans', 'Droid Sans', Arial, sans-serif;
+	text-align: center;
+	pointer-events: auto;
+	touch-action: none;
+	/* ノッチ/ホームインジケータの safe-area を避けて文字を置く */
+	padding: calc(2rem + env(safe-area-inset-top)) calc(1rem + env(safe-area-inset-right))
+		calc(2rem + env(safe-area-inset-bottom)) calc(1rem + env(safe-area-inset-left));
+	flex-direction: column;
+	justify-content: center;
+	align-items: center;
+}
+
+@media (orientation: portrait) {
+	#rotate-overlay {
+		display: flex;
+	}
+}
+
+#rotate-overlay .rotate-icon {
+	font-size: 3rem;
+	margin-bottom: 1rem;
+}
 		</style>
 		<link id="-gd-engine-icon" rel="icon" type="image/png" href="index.icon.png" />
 <link rel="apple-touch-icon" href="index.apple-touch-icon.png"/>
@@ -99,19 +174,26 @@ body {
 			Your browser does not support the canvas tag.
 		</canvas>
 
+		<div id="safe-area-probe" aria-hidden="true"></div>
+
+		<div id="rotate-overlay" aria-hidden="true">
+			<div class="rotate-icon">&#8635;&#128241;</div>
+			<div>端末を横向きにしてください</div>
+		</div>
+
 		<noscript>
 			Your browser does not support JavaScript.
 		</noscript>
 
 		<div id="status">
-			<img id="status-splash" class="show-image--true fullsize--true use-filter--true" src="index.png" alt="">
+			<img id="status-splash" class="show-image--false fullsize--true use-filter--true" src="index.png" alt="">
 			<progress id="status-progress"></progress>
 			<div id="status-notice"></div>
 		</div>
 
 		<script src="index.js"></script>
 		<script>
-const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":39594784,"index.wasm":35739700},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4};
+const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":40739868,"index.wasm":39513091},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4};
 const GODOT_THREADS_ENABLED = false;
 const engine = new Engine(GODOT_CONFIG);
 
@@ -119,6 +201,13 @@ const engine = new Engine(GODOT_CONFIG);
 	const statusOverlay = document.getElementById('status');
 	const statusProgress = document.getElementById('status-progress');
 	const statusNotice = document.getElementById('status-notice');
+
+	// iOS Safari のピンチ(gesture イベント)によるページズームを抑制する。
+	// touch-action:none が効かない旧 Safari 向けのフォールバック。
+	// ゲームページ全体がゲーム領域なので document 単位で問題ない。
+	['gesturestart', 'gesturechange', 'gestureend'].forEach(function (name) {
+		document.addEventListener(name, function (ev) { ev.preventDefault(); }, { passive: false });
+	});
 
 	let initializing = true;
 	let statusMode = '';
