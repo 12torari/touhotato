@@ -6,6 +6,16 @@
 		     (safe-area は縦画面案内オーバーレイ側で env() 考慮)。
 		     user-scalable=no + touch-action:none でピンチズームによるゲーム誤操作を防ぐ。 -->
 		<meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1.0, viewport-fit=cover">
+		<!-- 2026-07-26: スマホ実機で「ブラウザのアドレスバー＋タブバーが画面の約1/4を占有して
+		     見づらい」という報告への対応。ホーム画面に追加して起動したときだけ standalone
+		     （ブラウザUIなし＝全画面）で開く。通常のブラウザ表示は従来どおりで、既存のWeb
+		     ビルド構造（service worker 等）には手を入れない＝公開版を壊さない範囲の変更。
+		     black-translucent はステータスバーを canvas の上に重ねる指定で、viewport-fit=cover
+		     と組み合わせると縦方向をさらに稼げる（safe-area は既存の env() 側で考慮済み）。 -->
+		<meta name="apple-mobile-web-app-capable" content="yes">
+		<meta name="mobile-web-app-capable" content="yes">
+		<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+		<meta name="apple-mobile-web-app-title" content="Touhotato">
 		<title>touhotato</title>
 		<style>
 html, body, #canvas {
@@ -35,6 +45,15 @@ body {
 	touch-action: none;
 	/* 長押しメニュー/テキスト選択の抑制はゲーム領域(canvas)に限定する
 	   (ページ全体のアクセシビリティを不必要に壊さない) */
+	-webkit-user-select: none;
+	user-select: none;
+	-webkit-touch-callout: none;
+}
+
+/* 2026-07-30: 縦画面案内と開始画面の文字が長押しで選択され、iOSのコピー吹き出しが
+   ゲーム上に乗っていた。canvas と同じ抑制をこの2要素にも掛ける。
+   #status-notice(エラー本文)は不具合報告でコピーしたいので対象に含めない。 */
+#rotate-overlay, #status-start {
 	-webkit-user-select: none;
 	user-select: none;
 	-webkit-touch-callout: none;
@@ -87,7 +106,7 @@ body {
 	image-rendering: pixelated;
 }
 
-#status-progress, #status-notice {
+#status-progress, #status-notice, #status-start {
 	display: none;
 }
 
@@ -95,6 +114,25 @@ body {
 	bottom: 10%;
 	width: 50%;
 	margin: 0 auto;
+}
+
+/* 2026-07-30: ロード中の画面が「ほぼ黒＋無地の進捗バー」だけで、
+   数十MBの読み込みを文字ゼロで待たせていた（止まったのか読み込み中なのか分からない）。
+   進捗バーの直下に説明文を出す。 */
+#status-loading-note {
+	display: none;
+	position: absolute;
+	bottom: 5%;
+	left: 0;
+	right: 0;
+	color: #b9a7ae;
+	font-family: 'Noto Sans', 'Droid Sans', Arial, sans-serif;
+	font-size: 0.85rem;
+	line-height: 1.4;
+	text-align: center;
+	-webkit-user-select: none;
+	user-select: none;
+	z-index: 1;
 }
 
 #status-notice {
@@ -109,6 +147,36 @@ body {
 	padding: 1rem;
 	text-align: center;
 	z-index: 1;
+}
+
+#status-start {
+	position: relative;
+	z-index: 2;
+	font-family: 'Noto Sans', 'Droid Sans', Arial, sans-serif;
+	text-align: center;
+}
+
+#status-start-button {
+	min-width: 12rem;
+	min-height: 3rem;
+	border: 2px solid #b997d1;
+	border-radius: 0.5rem;
+	background-color: #2d1e3c;
+	color: #f5edf8;
+	font: inherit;
+	font-size: 1rem;
+	padding: 0.7rem 1.2rem;
+	touch-action: manipulation;
+}
+
+#status-start-button:active {
+	background-color: #4a315f;
+}
+
+#status-start-note {
+	color: #c5b8ce;
+	font-size: 0.8rem;
+	margin-top: 0.6rem;
 }
 
 /* --- safe-area 計測プローブ (2026-07-19 Codex監査是正・確定バグ4) ---
@@ -188,19 +256,73 @@ body {
 		<div id="status">
 			<img id="status-splash" class="show-image--false fullsize--true use-filter--true" src="index.png" alt="">
 			<progress id="status-progress"></progress>
+			<div id="status-loading-note">読み込み中です。初回は時間がかかります（回線によって数十秒〜数分）。<br>このタブを開いたままお待ちください。</div>
 			<div id="status-notice"></div>
+			<div id="status-start">
+				<button id="status-start-button" type="button">タップ／クリックして開始</button>
+				<div id="status-start-note">音声が有効になります</div>
+			</div>
 		</div>
 
 		<script src="index.js"></script>
 		<script>
-const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":40739868,"index.wasm":39513091},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4};
+const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":30318412,"index.wasm":39513091},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4};
 const GODOT_THREADS_ENABLED = false;
-const engine = new Engine(GODOT_CONFIG);
 
 (function () {
 	const statusOverlay = document.getElementById('status');
 	const statusProgress = document.getElementById('status-progress');
 	const statusNotice = document.getElementById('status-notice');
+	const statusLoadingNote = document.getElementById('status-loading-note');
+	const statusStart = document.getElementById('status-start');
+	const statusStartButton = document.getElementById('status-start-button');
+	const mainPack = GODOT_CONFIG['mainPack'] || GODOT_CONFIG['executable'] + '.pck';
+	const query = new URLSearchParams(window.location.search);
+	const stage1QaEnabled = query.get('ttqa_stage1') === '1';
+	const stage1QaArgs = [];
+	if (stage1QaEnabled) {
+		const seed = query.get('seed') || '';
+		const slot = query.get('slot') || '';
+		const policy = query.get('policy') || '';
+		const overlayBase64 = query.get('stage1_overlay_base64') || '';
+		if (!/^[0-9]+$/.test(seed)
+				|| !/^[0-9]+$/.test(slot)
+				|| !['stage1_survival', 'stage1_attack_collect', 'stage1_simple_probe'].includes(policy)
+				|| !/^[A-Za-z0-9+/]+={0,2}$/.test(overlayBase64)) {
+			throw new Error('Invalid Stage 1 QA query parameters.');
+		}
+		stage1QaArgs.push(
+			'--',
+			'--qa',
+			'--scenario=stage1_pdca',
+			'--char=char_knight',
+			'--danger=1',
+			'--timescale=1',
+			'--seed=' + seed,
+			'--slot=' + slot,
+			'--start-stage=1',
+			'--stop-at-stage=0',
+			'--qa-fixed-fps=60',
+			'--policy=' + policy,
+			'--mute',
+			'--stage1-overlay-base64=' + overlayBase64
+		);
+	}
+	const engineConfig = Object.assign({}, GODOT_CONFIG, {
+		'args': ['--main-pack', mainPack]
+			.concat(GODOT_CONFIG['args'] || [])
+			.concat(stage1QaArgs),
+		'onProgress': function (current, total) {
+			if (current > 0 && total > 0) {
+				statusProgress.value = current;
+				statusProgress.max = total;
+			} else {
+				statusProgress.removeAttribute('value');
+				statusProgress.removeAttribute('max');
+			}
+		},
+	});
+	const engine = new Engine(engineConfig);
 
 	// iOS Safari のピンチ(gesture イベント)によるページズームを抑制する。
 	// touch-action:none が効かない旧 Safari 向けのフォールバック。
@@ -224,6 +346,11 @@ const engine = new Engine(GODOT_CONFIG);
 		statusOverlay.style.visibility = 'visible';
 		statusProgress.style.display = mode === 'progress' ? 'block' : 'none';
 		statusNotice.style.display = mode === 'notice' ? 'block' : 'none';
+		// 2026-07-30: 進捗表示中だけロード説明文を出す。
+		if (statusLoadingNote) {
+			statusLoadingNote.style.display = mode === 'progress' ? 'block' : 'none';
+		}
+		statusStart.style.display = mode === 'start' ? 'block' : 'none';
 		statusMode = mode;
 	}
 
@@ -240,16 +367,46 @@ const engine = new Engine(GODOT_CONFIG);
 
 	function displayFailureNotice(err) {
 		console.error(err);
+		// 2026-07-30: 旧実装は英語1行を出して終わりで、再読み込み手段も日本語の説明も無く、
+		// 以後どの表示にも戻れない恒久停止だった。原因の技術的な行は残しつつ（不具合報告で
+		// コピーできる）、日本語の案内と再読み込みボタンを添える。
+		var detail = 'An unknown error occurred.';
 		if (err instanceof Error) {
-			setStatusNotice(err.message);
+			detail = err.message;
 		} else if (typeof err === 'string') {
-			setStatusNotice(err);
-		} else {
-			setStatusNotice('An unknown error occurred.');
+			detail = err;
+		}
+		setStatusNotice('読み込みに失敗しました。\n通信状況を確認して、下のボタンで再読み込みしてください。\n\n' + detail);
+		if (!document.getElementById('status-reload-button')) {
+			var reload = document.createElement('button');
+			reload.id = 'status-reload-button';
+			reload.type = 'button';
+			reload.textContent = '再読み込み';
+			reload.style.cssText = 'display:block;margin:0.8rem auto 0;padding:0.5rem 1.2rem;'
+				+ 'font-family:inherit;font-size:1rem;cursor:pointer;'
+				+ 'color:#fff6ec;background:#4d2b33;border:1px solid #c94f6e;border-radius:0.4rem;';
+			reload.addEventListener('click', function () { window.location.reload(); });
+			statusNotice.appendChild(reload);
 		}
 		setStatusMode('notice');
 		initializing = false;
 	}
+
+	function startFromUserGesture() {
+		if (statusMode !== 'start') {
+			return;
+		}
+		statusStartButton.disabled = true;
+		// AudioManager reads this flag during Godot startup. It is set before
+		// callMain so title BGM can start inside this trusted browser action.
+		window.__touhotato_audio_unlocked = true;
+		setStatusMode('progress');
+		engine.start().then(() => {
+			setStatusMode('hidden');
+		}, displayFailureNotice);
+	}
+
+	statusStartButton.addEventListener('click', startFromUserGesture);
 
 	const missing = Engine.getMissingFeatures({
 		threads: GODOT_THREADS_ENABLED,
@@ -288,18 +445,13 @@ const engine = new Engine(GODOT_CONFIG);
 		}
 	} else {
 		setStatusMode('progress');
-		engine.startGame({
-			'onProgress': function (current, total) {
-				if (current > 0 && total > 0) {
-					statusProgress.value = current;
-					statusProgress.max = total;
-				} else {
-					statusProgress.removeAttribute('value');
-					statusProgress.removeAttribute('max');
-				}
-			},
-		}).then(() => {
-			setStatusMode('hidden');
+		// Download and initialize first. Starting Godot itself waits for an
+		// explicit click/tap so mobile browsers allow Web Audio.
+		Promise.all([
+			engine.init(GODOT_CONFIG['executable']),
+			engine.preloadFile(mainPack, mainPack),
+		]).then(() => {
+			setStatusMode('start');
 		}, displayFailureNotice);
 	}
 }());
