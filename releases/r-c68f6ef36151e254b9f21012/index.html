@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="ja">
+	<head>
+		<meta charset="utf-8">
+		<!-- viewport-fit=cover: iPhoneのノッチ/ホームインジケータ領域までcanvasを広げる
+		     (safe-area は縦画面案内オーバーレイ側で env() 考慮)。
+		     user-scalable=no + touch-action:none でピンチズームによるゲーム誤操作を防ぐ。 -->
+		<meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1.0, viewport-fit=cover">
+		<!-- 2026-07-26: スマホ実機で「ブラウザのアドレスバー＋タブバーが画面の約1/4を占有して
+		     見づらい」という報告への対応。ホーム画面に追加して起動したときだけ standalone
+		     （ブラウザUIなし＝全画面）で開く。通常のブラウザ表示は従来どおりで、既存のWeb
+		     ビルド構造（service worker 等）には手を入れない＝公開版を壊さない範囲の変更。
+		     black-translucent はステータスバーを canvas の上に重ねる指定で、viewport-fit=cover
+		     と組み合わせると縦方向をさらに稼げる（safe-area は既存の env() 側で考慮済み）。 -->
+		<meta name="apple-mobile-web-app-capable" content="yes">
+		<meta name="mobile-web-app-capable" content="yes">
+		<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+		<meta name="apple-mobile-web-app-title" content="Touhotato">
+		<title>touhotato</title>
+		<style>
+html, body, #canvas {
+	margin: 0;
+	padding: 0;
+	border: 0;
+}
+
+body {
+	color: white;
+	/* letterbox/背景色はゲームの boot_splash/bg_color=Color(0.04,0.03,0.07) と統一 */
+	background-color: #0A0812;
+	overflow: hidden;
+	/* スクロール/オーバースクロール/ダブルタップズームをゲーム領域で無効化 */
+	touch-action: none;
+	overscroll-behavior: none;
+	/* iOS Safari のアドレスバー伸縮でも全面を維持 */
+	position: fixed;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+}
+
+#canvas {
+	display: block;
+	/* ゲームcanvas上のタッチをブラウザ既定動作(スクロール等)へ渡さない */
+	touch-action: none;
+	/* 長押しメニュー/テキスト選択の抑制はゲーム領域(canvas)に限定する
+	   (ページ全体のアクセシビリティを不必要に壊さない) */
+	-webkit-user-select: none;
+	user-select: none;
+	-webkit-touch-callout: none;
+}
+
+/* 2026-07-30: 縦画面案内と開始画面の文字が長押しで選択され、iOSのコピー吹き出しが
+   ゲーム上に乗っていた。canvas と同じ抑制をこの2要素にも掛ける。
+   #status-notice(エラー本文)は不具合報告でコピーしたいので対象に含めない。 */
+#rotate-overlay, #status-start {
+	-webkit-user-select: none;
+	user-select: none;
+	-webkit-touch-callout: none;
+}
+
+#canvas:focus {
+	outline: none;
+}
+
+#status, #status-splash, #status-progress {
+	position: absolute;
+	left: 0;
+	right: 0;
+}
+
+#status, #status-splash {
+	top: 0;
+	bottom: 0;
+}
+
+#status {
+	background-color: #0a0812;
+	/* rotate-overlay(z-index:10)より前面に置く: portrait中でもロード進捗と
+	   エラー通知が隠れず読める(2026-07-19 静的監査是正)。 */
+	z-index: 11;
+	display: flex;
+	flex-direction: column;
+	justify-content: center;
+	align-items: center;
+	visibility: hidden;
+}
+
+#status-splash {
+	max-height: 100%;
+	max-width: 100%;
+	margin: auto;
+}
+
+#status-splash.show-image--false {
+	display: none;
+}
+
+#status-splash.fullsize--true {
+	height: 100%;
+	width: 100%;
+	object-fit: contain;
+}
+
+#status-splash.use-filter--false {
+	image-rendering: pixelated;
+}
+
+#status-progress, #status-notice, #status-start {
+	display: none;
+}
+
+#status-progress {
+	bottom: 10%;
+	width: 50%;
+	margin: 0 auto;
+}
+
+/* 2026-07-30: ロード中の画面が「ほぼ黒＋無地の進捗バー」だけで、
+   数十MBの読み込みを文字ゼロで待たせていた（止まったのか読み込み中なのか分からない）。
+   進捗バーの直下に説明文を出す。 */
+#status-loading-note {
+	display: none;
+	position: absolute;
+	bottom: 5%;
+	left: 0;
+	right: 0;
+	color: #b9a7ae;
+	font-family: 'Noto Sans', 'Droid Sans', Arial, sans-serif;
+	font-size: 0.85rem;
+	line-height: 1.4;
+	text-align: center;
+	-webkit-user-select: none;
+	user-select: none;
+	z-index: 1;
+}
+
+#status-notice {
+	background-color: #5b3943;
+	border-radius: 0.5rem;
+	border: 1px solid #9b3943;
+	color: #e0e0e0;
+	font-family: 'Noto Sans', 'Droid Sans', Arial, sans-serif;
+	line-height: 1.3;
+	margin: 0 2rem;
+	overflow: hidden;
+	padding: 1rem;
+	text-align: center;
+	z-index: 1;
+}
+
+#status-start {
+	position: relative;
+	z-index: 2;
+	font-family: 'Noto Sans', 'Droid Sans', Arial, sans-serif;
+	text-align: center;
+}
+
+#status-start-button {
+	min-width: 12rem;
+	min-height: 3rem;
+	border: 2px solid #b997d1;
+	border-radius: 0.5rem;
+	background-color: #2d1e3c;
+	color: #f5edf8;
+	font: inherit;
+	font-size: 1rem;
+	padding: 0.7rem 1.2rem;
+	touch-action: manipulation;
+}
+
+#status-start-button:active {
+	background-color: #4a315f;
+}
+
+#status-start-note {
+	color: #c5b8ce;
+	font-size: 0.8rem;
+	margin-top: 0.6rem;
+}
+
+/* --- safe-area 計測プローブ (2026-07-19 Codex監査是正・確定バグ4) ---
+   env(safe-area-inset-*) の実値(CSS px)を padding として持つ不可視要素。
+   ゲーム側(mobile_input_controller.gd)が JavaScriptBridge で computedStyle を
+   読み、戦闘ボタンの配置へ反映する。表示・入力へは一切関与しない。 */
+#safe-area-probe {
+	position: fixed;
+	visibility: hidden;
+	pointer-events: none;
+	width: 0;
+	height: 0;
+	padding-top: env(safe-area-inset-top, 0px);
+	padding-right: env(safe-area-inset-right, 0px);
+	padding-bottom: env(safe-area-inset-bottom, 0px);
+	padding-left: env(safe-area-inset-left, 0px);
+}
+
+/* --- 縦画面案内オーバーレイ (2026-07-18 スマホWeb対応 / 2026-07-19 是正) ---
+   タイトルを含む全シーンで、縦向き(portrait)のときだけ表示する。
+   2026-07-19: pointer-events:auto で portrait 中は背後のゲーム入力を遮断する
+   (安全側採用: 縦向きのまま背後のメニュー/戦闘が誤操作されない)。
+   landscape では display:none となり入力へ一切関与しない。音声開始の初回
+   gesture は「横向きに直した後の最初の操作」が canvas に届いて成立する
+   (portrait 中の gesture で開始できない点は仕様上のトレードオフ)。
+   orientation lock の成功は前提にしない(CSS media query のみで判定)。 */
+#rotate-overlay {
+	display: none;
+	position: fixed;
+	inset: 0;
+	z-index: 10;
+	background-color: rgba(10, 8, 18, 0.92);
+	color: #e0e0e0;
+	font-family: 'Noto Sans', 'Droid Sans', Arial, sans-serif;
+	text-align: center;
+	pointer-events: auto;
+	touch-action: none;
+	/* ノッチ/ホームインジケータの safe-area を避けて文字を置く */
+	padding: calc(2rem + env(safe-area-inset-top)) calc(1rem + env(safe-area-inset-right))
+		calc(2rem + env(safe-area-inset-bottom)) calc(1rem + env(safe-area-inset-left));
+	flex-direction: column;
+	justify-content: center;
+	align-items: center;
+}
+
+@media (orientation: portrait) {
+	#rotate-overlay {
+		display: flex;
+	}
+}
+
+#rotate-overlay .rotate-icon {
+	font-size: 3rem;
+	margin-bottom: 1rem;
+}
+		</style>
+		<link id="-gd-engine-icon" rel="icon" type="image/png" href="index.icon.png" />
+<link rel="apple-touch-icon" href="index.apple-touch-icon.png"/>
+
+	</head>
+	<body>
+		<canvas id="canvas">
+			Your browser does not support the canvas tag.
+		</canvas>
+
+		<div id="safe-area-probe" aria-hidden="true"></div>
+
+		<div id="rotate-overlay" aria-hidden="true">
+			<div class="rotate-icon">&#8635;&#128241;</div>
+			<div>端末を横向きにしてください</div>
+		</div>
+
+		<noscript>
+			Your browser does not support JavaScript.
+		</noscript>
+
+		<div id="status">
+			<img id="status-splash" class="show-image--false fullsize--true use-filter--true" src="index.png" alt="">
+			<progress id="status-progress"></progress>
+			<div id="status-loading-note">読み込み中です。初回は時間がかかります（回線によって数十秒〜数分）。<br>このタブを開いたままお待ちください。</div>
+			<div id="status-notice"></div>
+			<div id="status-start">
+				<button id="status-start-button" type="button">タップ／クリックして開始</button>
+				<div id="status-start-note">音声が有効になります</div>
+			</div>
+		</div>
+
+		<script src="index.js"></script>
+		<script>
+const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":30870360,"index.wasm":39514754},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4};
+const GODOT_THREADS_ENABLED = false;
+
+(function () {
+	// One lifetime Web Lock owns every save-family mutation in this tab. The
+	// readiness promise resolves after acquisition, while the callback returns a
+	// second promise that remains pending until pagehide/unload. Unsupported or
+	// contended browsers stay read-only; SaveManager reports the reason in-game.
+	window.__touhotato_save_lock_held = false;
+	let saveLockRelease = null;
+	let saveLockAttempt = null;
+	window.__touhotato_try_save_lock = function () {
+		if (window.__touhotato_save_lock_held) {
+			return Promise.resolve(true);
+		}
+		if (saveLockAttempt) {
+			return saveLockAttempt;
+		}
+		if (!navigator.locks || typeof navigator.locks.request !== 'function') {
+			window.__touhotato_save_lock_held = false;
+			return Promise.resolve(false);
+		}
+		saveLockAttempt = new Promise(function (resolveAttempt) {
+			navigator.locks.request(
+				'touhotato-save-writer-v1',
+				{mode: 'exclusive', ifAvailable: true},
+				function (lock) {
+					if (!lock) {
+						window.__touhotato_save_lock_held = false;
+						saveLockAttempt = null;
+						resolveAttempt(false);
+						return;
+					}
+					window.__touhotato_save_lock_held = true;
+					resolveAttempt(true);
+					return new Promise(function (release) { saveLockRelease = release; });
+				}
+			).catch(function (err) {
+				console.warn('Touhotato save writer lock failed:', err);
+				window.__touhotato_save_lock_held = false;
+				saveLockAttempt = null;
+				resolveAttempt(false);
+			});
+		});
+		return saveLockAttempt;
+	};
+	window.addEventListener('pagehide', function () {
+		window.__touhotato_save_lock_held = false;
+		saveLockAttempt = null;
+		if (saveLockRelease) {
+			const release = saveLockRelease;
+			saveLockRelease = null;
+			release();
+		}
+	});
+	window.addEventListener('pageshow', function () {
+		window.__touhotato_try_save_lock();
+		// pagehide releases asynchronously. Retry once after the old callback has
+		// returned so a bfcache restore cannot lose the lock to its own release race.
+		setTimeout(function () {
+			if (!window.__touhotato_save_lock_held) {
+				window.__touhotato_try_save_lock();
+			}
+		}, 50);
+	});
+	window.addEventListener('focus', function () {
+		if (!window.__touhotato_save_lock_held) {
+			window.__touhotato_try_save_lock();
+		}
+	});
+	document.addEventListener('visibilitychange', function () {
+		if (document.visibilityState === 'visible' && !window.__touhotato_save_lock_held) {
+			window.__touhotato_try_save_lock();
+		}
+	});
+
+	// The browser file picker only transports text. Godot performs schema,
+	// version, and type validation and requires a second explicit confirmation
+	// before replacing any save bytes.
+	let saveImportResult = {state: 'idle'};
+	window.__touhotato_request_save_import = function () {
+		if (saveImportResult.state === 'pending') {
+			return;
+		}
+		saveImportResult = {state: 'pending'};
+		const input = document.createElement('input');
+		input.type = 'file';
+		input.accept = '.json,application/json';
+		input.addEventListener('change', function () {
+			const file = input.files && input.files[0];
+			if (!file) {
+				saveImportResult = {state: 'cancelled'};
+				return;
+			}
+			if (file.size > 1024 * 1024) {
+				saveImportResult = {state: 'error', error: 'ファイルが1 MiBの上限を超えています。'};
+				return;
+			}
+			const reader = new FileReader();
+			reader.onload = function () {
+				saveImportResult = {state: 'ready', text: String(reader.result || '')};
+			};
+			reader.onerror = function () {
+				saveImportResult = {state: 'error', error: '選択したファイルを読み込めませんでした。'};
+			};
+			reader.readAsText(file, 'utf-8');
+		}, {once: true});
+		input.addEventListener('cancel', function () {
+			saveImportResult = {state: 'cancelled'};
+		}, {once: true});
+		input.click();
+	};
+	window.__touhotato_consume_save_import = function () {
+		if (saveImportResult.state === 'idle') {
+			return '';
+		}
+		if (saveImportResult.state === 'pending') {
+			return JSON.stringify(saveImportResult);
+		}
+		const serialized = JSON.stringify(saveImportResult);
+		saveImportResult = {state: 'idle'};
+		return serialized;
+	};
+
+	const statusOverlay = document.getElementById('status');
+	const statusProgress = document.getElementById('status-progress');
+	const statusNotice = document.getElementById('status-notice');
+	const statusLoadingNote = document.getElementById('status-loading-note');
+	const statusStart = document.getElementById('status-start');
+	const statusStartButton = document.getElementById('status-start-button');
+	const mainPack = GODOT_CONFIG['mainPack'] || GODOT_CONFIG['executable'] + '.pck';
+	const query = new URLSearchParams(window.location.search);
+	const stage1QaEnabled = query.get('ttqa_stage1') === '1';
+	const stage1QaArgs = [];
+	if (stage1QaEnabled) {
+		const seed = query.get('seed') || '';
+		const slot = query.get('slot') || '';
+		const policy = query.get('policy') || '';
+		const overlayBase64 = query.get('stage1_overlay_base64') || '';
+		if (!/^[0-9]+$/.test(seed)
+				|| !/^[0-9]+$/.test(slot)
+				|| !['stage1_survival', 'stage1_attack_collect', 'stage1_simple_probe'].includes(policy)
+				|| !/^[A-Za-z0-9+/]+={0,2}$/.test(overlayBase64)) {
+			throw new Error('Invalid Stage 1 QA query parameters.');
+		}
+		stage1QaArgs.push(
+			'--',
+			'--qa',
+			'--scenario=stage1_pdca',
+			'--char=char_knight',
+			'--danger=1',
+			'--timescale=1',
+			'--seed=' + seed,
+			'--slot=' + slot,
+			'--start-stage=1',
+			'--stop-at-stage=0',
+			'--qa-fixed-fps=60',
+			'--policy=' + policy,
+			'--mute',
+			'--stage1-overlay-base64=' + overlayBase64
+		);
+	}
+	const engineConfig = Object.assign({}, GODOT_CONFIG, {
+		'args': ['--main-pack', mainPack]
+			.concat(GODOT_CONFIG['args'] || [])
+			.concat(stage1QaArgs),
+		'onProgress': function (current, total) {
+			if (current > 0 && total > 0) {
+				statusProgress.value = current;
+				statusProgress.max = total;
+			} else {
+				statusProgress.removeAttribute('value');
+				statusProgress.removeAttribute('max');
+			}
+		},
+	});
+	const engine = new Engine(engineConfig);
+
+	// iOS Safari のピンチ(gesture イベント)によるページズームを抑制する。
+	// touch-action:none が効かない旧 Safari 向けのフォールバック。
+	// ゲームページ全体がゲーム領域なので document 単位で問題ない。
+	['gesturestart', 'gesturechange', 'gestureend'].forEach(function (name) {
+		document.addEventListener(name, function (ev) { ev.preventDefault(); }, { passive: false });
+	});
+
+	let initializing = true;
+	let statusMode = '';
+
+	function setStatusMode(mode) {
+		if (statusMode === mode || !initializing) {
+			return;
+		}
+		if (mode === 'hidden') {
+			statusOverlay.remove();
+			initializing = false;
+			return;
+		}
+		statusOverlay.style.visibility = 'visible';
+		statusProgress.style.display = mode === 'progress' ? 'block' : 'none';
+		statusNotice.style.display = mode === 'notice' ? 'block' : 'none';
+		// 2026-07-30: 進捗表示中だけロード説明文を出す。
+		if (statusLoadingNote) {
+			statusLoadingNote.style.display = mode === 'progress' ? 'block' : 'none';
+		}
+		statusStart.style.display = mode === 'start' ? 'block' : 'none';
+		statusMode = mode;
+	}
+
+	function setStatusNotice(text) {
+		while (statusNotice.lastChild) {
+			statusNotice.removeChild(statusNotice.lastChild);
+		}
+		const lines = text.split('\n');
+		lines.forEach((line) => {
+			statusNotice.appendChild(document.createTextNode(line));
+			statusNotice.appendChild(document.createElement('br'));
+		});
+	}
+
+	function displayFailureNotice(err) {
+		console.error(err);
+		// 2026-07-30: 旧実装は英語1行を出して終わりで、再読み込み手段も日本語の説明も無く、
+		// 以後どの表示にも戻れない恒久停止だった。原因の技術的な行は残しつつ（不具合報告で
+		// コピーできる）、日本語の案内と再読み込みボタンを添える。
+		var detail = 'An unknown error occurred.';
+		if (err instanceof Error) {
+			detail = err.message;
+		} else if (typeof err === 'string') {
+			detail = err;
+		}
+		setStatusNotice('読み込みに失敗しました。\n通信状況を確認して、下のボタンで再読み込みしてください。\n\n' + detail);
+		if (!document.getElementById('status-reload-button')) {
+			var reload = document.createElement('button');
+			reload.id = 'status-reload-button';
+			reload.type = 'button';
+			reload.textContent = '再読み込み';
+			reload.style.cssText = 'display:block;margin:0.8rem auto 0;padding:0.5rem 1.2rem;'
+				+ 'font-family:inherit;font-size:1rem;cursor:pointer;'
+				+ 'color:#fff6ec;background:#4d2b33;border:1px solid #c94f6e;border-radius:0.4rem;';
+			reload.addEventListener('click', function () { window.location.reload(); });
+			statusNotice.appendChild(reload);
+		}
+		setStatusMode('notice');
+		initializing = false;
+	}
+
+	function startFromUserGesture() {
+		if (statusMode !== 'start') {
+			return;
+		}
+		statusStartButton.disabled = true;
+		// AudioManager reads this flag during Godot startup. It is set before
+		// callMain so title BGM can start inside this trusted browser action.
+		window.__touhotato_audio_unlocked = true;
+		setStatusMode('progress');
+		engine.start().then(() => {
+			setStatusMode('hidden');
+		}, displayFailureNotice);
+	}
+
+	statusStartButton.addEventListener('click', startFromUserGesture);
+
+	const missing = Engine.getMissingFeatures({
+		threads: GODOT_THREADS_ENABLED,
+	});
+
+	if (missing.length !== 0) {
+		if (GODOT_CONFIG['serviceWorker'] && GODOT_CONFIG['ensureCrossOriginIsolationHeaders'] && 'serviceWorker' in navigator) {
+			let serviceWorkerRegistrationPromise;
+			try {
+				serviceWorkerRegistrationPromise = navigator.serviceWorker.getRegistration();
+			} catch (err) {
+				serviceWorkerRegistrationPromise = Promise.reject(new Error('Service worker registration failed.'));
+			}
+			// There's a chance that installing the service worker would fix the issue
+			Promise.race([
+				serviceWorkerRegistrationPromise.then((registration) => {
+					if (registration != null) {
+						return Promise.reject(new Error('Service worker already exists.'));
+					}
+					return registration;
+				}).then(() => engine.installServiceWorker()),
+				// For some reason, `getRegistration()` can stall
+				new Promise((resolve) => {
+					setTimeout(() => resolve(), 2000);
+				}),
+			]).then(() => {
+				// Reload if there was no error.
+				window.location.reload();
+			}).catch((err) => {
+				console.error('Error while registering service worker:', err);
+			});
+		} else {
+			// Display the message as usual
+			const missingMsg = 'Error\nThe following features required to run Godot projects on the Web are missing:\n';
+			displayFailureNotice(missingMsg + missing.join('\n'));
+		}
+	} else {
+		setStatusMode('progress');
+		// Download and initialize first. Starting Godot itself waits for an
+		// explicit click/tap so mobile browsers allow Web Audio.
+		Promise.all([
+			window.__touhotato_try_save_lock(),
+			engine.init(GODOT_CONFIG['executable']),
+			engine.preloadFile(mainPack, mainPack),
+		]).then(() => {
+			setStatusMode('start');
+		}, displayFailureNotice);
+	}
+}());
+		</script>
+	</body>
+</html>
+

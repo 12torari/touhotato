@@ -233,8 +233,8 @@ body {
 	margin-bottom: 1rem;
 }
 		</style>
-		<link id="-gd-engine-icon" rel="icon" type="image/png" href="index.icon.png" />
-<link rel="apple-touch-icon" href="index.apple-touch-icon.png"/>
+		<link id="-gd-engine-icon" rel="icon" type="image/png" href="releases/r-c68f6ef36151e254b9f21012/index.icon.png" />
+<link rel="apple-touch-icon" href="releases/r-c68f6ef36151e254b9f21012/index.apple-touch-icon.png"/>
 
 	</head>
 	<body>
@@ -254,7 +254,7 @@ body {
 		</noscript>
 
 		<div id="status">
-			<img id="status-splash" class="show-image--false fullsize--true use-filter--true" src="index.png" alt="">
+			<img id="status-splash" class="show-image--false fullsize--true use-filter--true" src="releases/r-c68f6ef36151e254b9f21012/index.png" alt="">
 			<progress id="status-progress"></progress>
 			<div id="status-loading-note">読み込み中です。初回は時間がかかります（回線によって数十秒〜数分）。<br>このタブを開いたままお待ちください。</div>
 			<div id="status-notice"></div>
@@ -264,12 +264,132 @@ body {
 			</div>
 		</div>
 
-		<script src="index.js"></script>
+		<script src="releases/r-c68f6ef36151e254b9f21012/index.js"></script>
 		<script>
-const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":30570872,"index.wasm":39513091},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4};
+const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"releases/r-c68f6ef36151e254b9f21012/index","experimentalVK":false,"fileSizes":{"releases/r-c68f6ef36151e254b9f21012/index.pck":30870360,"releases/r-c68f6ef36151e254b9f21012/index.wasm":39514754},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4};
 const GODOT_THREADS_ENABLED = false;
 
 (function () {
+	// One lifetime Web Lock owns every save-family mutation in this tab. The
+	// readiness promise resolves after acquisition, while the callback returns a
+	// second promise that remains pending until pagehide/unload. Unsupported or
+	// contended browsers stay read-only; SaveManager reports the reason in-game.
+	window.__touhotato_save_lock_held = false;
+	let saveLockRelease = null;
+	let saveLockAttempt = null;
+	window.__touhotato_try_save_lock = function () {
+		if (window.__touhotato_save_lock_held) {
+			return Promise.resolve(true);
+		}
+		if (saveLockAttempt) {
+			return saveLockAttempt;
+		}
+		if (!navigator.locks || typeof navigator.locks.request !== 'function') {
+			window.__touhotato_save_lock_held = false;
+			return Promise.resolve(false);
+		}
+		saveLockAttempt = new Promise(function (resolveAttempt) {
+			navigator.locks.request(
+				'touhotato-save-writer-v1',
+				{mode: 'exclusive', ifAvailable: true},
+				function (lock) {
+					if (!lock) {
+						window.__touhotato_save_lock_held = false;
+						saveLockAttempt = null;
+						resolveAttempt(false);
+						return;
+					}
+					window.__touhotato_save_lock_held = true;
+					resolveAttempt(true);
+					return new Promise(function (release) { saveLockRelease = release; });
+				}
+			).catch(function (err) {
+				console.warn('Touhotato save writer lock failed:', err);
+				window.__touhotato_save_lock_held = false;
+				saveLockAttempt = null;
+				resolveAttempt(false);
+			});
+		});
+		return saveLockAttempt;
+	};
+	window.addEventListener('pagehide', function () {
+		window.__touhotato_save_lock_held = false;
+		saveLockAttempt = null;
+		if (saveLockRelease) {
+			const release = saveLockRelease;
+			saveLockRelease = null;
+			release();
+		}
+	});
+	window.addEventListener('pageshow', function () {
+		window.__touhotato_try_save_lock();
+		// pagehide releases asynchronously. Retry once after the old callback has
+		// returned so a bfcache restore cannot lose the lock to its own release race.
+		setTimeout(function () {
+			if (!window.__touhotato_save_lock_held) {
+				window.__touhotato_try_save_lock();
+			}
+		}, 50);
+	});
+	window.addEventListener('focus', function () {
+		if (!window.__touhotato_save_lock_held) {
+			window.__touhotato_try_save_lock();
+		}
+	});
+	document.addEventListener('visibilitychange', function () {
+		if (document.visibilityState === 'visible' && !window.__touhotato_save_lock_held) {
+			window.__touhotato_try_save_lock();
+		}
+	});
+
+	// The browser file picker only transports text. Godot performs schema,
+	// version, and type validation and requires a second explicit confirmation
+	// before replacing any save bytes.
+	let saveImportResult = {state: 'idle'};
+	window.__touhotato_request_save_import = function () {
+		if (saveImportResult.state === 'pending') {
+			return;
+		}
+		saveImportResult = {state: 'pending'};
+		const input = document.createElement('input');
+		input.type = 'file';
+		input.accept = '.json,application/json';
+		input.addEventListener('change', function () {
+			const file = input.files && input.files[0];
+			if (!file) {
+				saveImportResult = {state: 'cancelled'};
+				return;
+			}
+			if (file.size > 1024 * 1024) {
+				saveImportResult = {state: 'error', error: 'ファイルが1 MiBの上限を超えています。'};
+				return;
+			}
+			const reader = new FileReader();
+			reader.onload = function () {
+				saveImportResult = {state: 'ready', text: String(reader.result || '')};
+			};
+			reader.onerror = function () {
+				saveImportResult = {state: 'error', error: '選択したファイルを読み込めませんでした。'};
+			};
+			reader.readAsText(file, 'utf-8');
+		}, {once: true});
+		input.addEventListener('cancel', function () {
+			saveImportResult = {state: 'cancelled'};
+		}, {once: true});
+		input.click();
+	};
+	window.__touhotato_consume_save_import = function () {
+		if (saveImportResult.state === 'idle') {
+			return '';
+		}
+		if (saveImportResult.state === 'pending') {
+			return JSON.stringify(saveImportResult);
+		}
+		const serialized = JSON.stringify(saveImportResult);
+		saveImportResult = {state: 'idle'};
+		return serialized;
+	};
+
 	const statusOverlay = document.getElementById('status');
 	const statusProgress = document.getElementById('status-progress');
 	const statusNotice = document.getElementById('status-notice');
@@ -448,6 +568,7 @@ const GODOT_THREADS_ENABLED = false;
 		// Download and initialize first. Starting Godot itself waits for an
 		// explicit click/tap so mobile browsers allow Web Audio.
 		Promise.all([
+			window.__touhotato_try_save_lock(),
 			engine.init(GODOT_CONFIG['executable']),
 			engine.preloadFile(mainPack, mainPack),
 		]).then(() => {
