@@ -233,8 +233,8 @@ body {
 	margin-bottom: 1rem;
 }
 		</style>
-		<link id="-gd-engine-icon" rel="icon" type="image/png" href="releases/r-a9023838edb0086102cabac9/index.icon.png" />
-<link rel="apple-touch-icon" href="releases/r-a9023838edb0086102cabac9/index.apple-touch-icon.png"/>
+		<link id="-gd-engine-icon" rel="icon" type="image/png" href="releases/r-0e82d5b7ad6b1f31604b7079/index.icon.png" />
+<link rel="apple-touch-icon" href="releases/r-0e82d5b7ad6b1f31604b7079/index.apple-touch-icon.png"/>
 
 	</head>
 	<body>
@@ -246,7 +246,7 @@ body {
 
 		<div id="rotate-overlay" aria-hidden="true">
 			<div class="rotate-icon">&#8635;&#128241;</div>
-			<div>端末を横向きにしてください</div>
+			<div>端末を横向きに</div>
 		</div>
 
 		<noscript>
@@ -254,9 +254,9 @@ body {
 		</noscript>
 
 		<div id="status">
-			<img id="status-splash" class="show-image--false fullsize--true use-filter--true" src="releases/r-a9023838edb0086102cabac9/index.png" alt="">
+			<img id="status-splash" class="show-image--false fullsize--true use-filter--true" src="releases/r-0e82d5b7ad6b1f31604b7079/index.png" alt="">
 			<progress id="status-progress"></progress>
-			<div id="status-loading-note">読み込み中です。初回は時間がかかります（回線によって数十秒〜数分）。<br>このタブを開いたままお待ちください。</div>
+			<div id="status-loading-note">読み込み中です。初回は数十秒〜数分かかります。</div>
 			<div id="status-notice"></div>
 			<div id="status-start">
 				<button id="status-start-button" type="button">タップ／クリックして開始</button>
@@ -264,9 +264,9 @@ body {
 			</div>
 		</div>
 
-		<script src="releases/r-a9023838edb0086102cabac9/index.js"></script>
+		<script src="releases/r-0e82d5b7ad6b1f31604b7079/index.js"></script>
 		<script>
-const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"releases/r-a9023838edb0086102cabac9/index","experimentalVK":false,"fileSizes":{"releases/r-a9023838edb0086102cabac9/index.pck":30887016,"releases/r-a9023838edb0086102cabac9/index.wasm":39514754},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4};
+const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"releases/r-0e82d5b7ad6b1f31604b7079/index","experimentalVK":false,"fileSizes":{"releases/r-0e82d5b7ad6b1f31604b7079/index.pck":31341200,"releases/r-0e82d5b7ad6b1f31604b7079/index.wasm":39514754},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4};
 const GODOT_THREADS_ENABLED = false;
 
 (function () {
@@ -496,7 +496,7 @@ const GODOT_THREADS_ENABLED = false;
 		} else if (typeof err === 'string') {
 			detail = err;
 		}
-		setStatusNotice('読み込みに失敗しました。\n通信状況を確認して、下のボタンで再読み込みしてください。\n\n' + detail);
+		setStatusNotice('読み込みに失敗しました。\n通信状況を確認\n\n' + detail);
 		if (!document.getElementById('status-reload-button')) {
 			var reload = document.createElement('button');
 			reload.id = 'status-reload-button';
