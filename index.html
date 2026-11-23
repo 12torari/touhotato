@@ -135,6 +135,23 @@ body {
 	z-index: 1;
 }
 
+/* 2026-11-23: 配布のページにも二次創作の明記を出す（上海アリス幻樂団のガイドライン「東方Projectの二次創作である事を
+   明記してください」。docs/canon/culture/community.md §2）。文はクレジットの DISCLAIMER（scripts/ui/credits_screen.gd）と同じ。
+   読み込み中・開始の案内・失敗の知らせの間ずっと上に出し、ゲームが始まると #status ごと消える。
+   tools/qa/web/verify_public_export.py が公開物の index.html にこの文があることを確かめる。 */
+#status-fanwork {
+	position: absolute;
+	top: calc(0.8rem + env(safe-area-inset-top, 0px));
+	left: calc(1rem + env(safe-area-inset-left, 0px));
+	right: calc(1rem + env(safe-area-inset-right, 0px));
+	color: #b9a7ae;
+	font-family: 'Noto Sans', 'Droid Sans', Arial, sans-serif;
+	font-size: 0.75rem;
+	line-height: 1.5;
+	text-align: center;
+	z-index: 1;
+}
+
 #status-notice {
 	background-color: #5b3943;
 	border-radius: 0.5rem;
@@ -233,8 +250,8 @@ body {
 	margin-bottom: 1rem;
 }
 		</style>
-		<link id="-gd-engine-icon" rel="icon" type="image/png" href="releases/r-530b806733e45661f62615f0/index.icon.png" />
-<link rel="apple-touch-icon" href="releases/r-530b806733e45661f62615f0/index.apple-touch-icon.png"/>
+		<link id="-gd-engine-icon" rel="icon" type="image/png" href="releases/r-1c714fb8e6b757a6d9e0f56d/index.icon.png" />
+<link rel="apple-touch-icon" href="releases/r-1c714fb8e6b757a6d9e0f56d/index.apple-touch-icon.png"/>
 
 	</head>
 	<body>
@@ -254,7 +271,8 @@ body {
 		</noscript>
 
 		<div id="status">
-			<img id="status-splash" class="show-image--false fullsize--true use-filter--true" src="releases/r-530b806733e45661f62615f0/index.png" alt="">
+			<div id="status-fanwork">本作は上海アリス幻樂団の『東方Project』の二次創作であり、上海アリス幻樂団とは一切関係のない非公式のファンメイド作品です。</div>
+			<img id="status-splash" class="show-image--false fullsize--true use-filter--true" src="releases/r-1c714fb8e6b757a6d9e0f56d/index.png" alt="">
 			<progress id="status-progress"></progress>
 			<div id="status-loading-note">読み込み中です。初回は数十秒〜数分かかります。</div>
 			<div id="status-notice"></div>
@@ -264,10 +282,10 @@ body {
 			</div>
 		</div>
 
-		<script>(function(){var m={"touhotato_native.web.template_release.wasm32.nothreads.wasm":"releases/r-530b806733e45661f62615f0/touhotato_native.web.template_release.wasm32.nothreads.wasm"};var f=window.fetch.bind(window);window.fetch=function(u,o){if(typeof u==="string"&&Object.prototype.hasOwnProperty.call(m,u)){u=m[u];}return f(u,o);};})();</script>
-<script src="releases/r-530b806733e45661f62615f0/index.js"></script>
+		<script>(function(){var m={"touhotato_native.web.template_release.wasm32.nothreads.wasm":"releases/r-1c714fb8e6b757a6d9e0f56d/touhotato_native.web.template_release.wasm32.nothreads.wasm"};var f=window.fetch.bind(window);window.fetch=function(u,o){if(typeof u==="string"&&Object.prototype.hasOwnProperty.call(m,u)){u=m[u];}return f(u,o);};})();</script>
+<script src="releases/r-1c714fb8e6b757a6d9e0f56d/index.js"></script>
 		<script>
-const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"releases/r-530b806733e45661f62615f0/index","experimentalVK":false,"fileSizes":{"releases/r-530b806733e45661f62615f0/index.pck":31822424,"releases/r-530b806733e45661f62615f0/index.wasm":1508095},"focusCanvas":true,"gdextensionLibs":["touhotato_native.web.template_release.wasm32.nothreads.wasm"],"godotPoolSize":4};
+const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"releases/r-1c714fb8e6b757a6d9e0f56d/index","experimentalVK":false,"fileSizes":{"releases/r-1c714fb8e6b757a6d9e0f56d/index.pck":36730844,"releases/r-1c714fb8e6b757a6d9e0f56d/index.wasm":1508095},"focusCanvas":true,"gdextensionLibs":["touhotato_native.web.template_release.wasm32.nothreads.wasm"],"godotPoolSize":4};
 const GODOT_THREADS_ENABLED = false;
 
 (function () {

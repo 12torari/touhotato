@@ -135,6 +135,23 @@ body {
 	z-index: 1;
 }
 
+/* 2026-11-23: 配布のページにも二次創作の明記を出す（上海アリス幻樂団のガイドライン「東方Projectの二次創作である事を
+   明記してください」。docs/canon/culture/community.md §2）。文はクレジットの DISCLAIMER（scripts/ui/credits_screen.gd）と同じ。
+   読み込み中・開始の案内・失敗の知らせの間ずっと上に出し、ゲームが始まると #status ごと消える。
+   tools/qa/web/verify_public_export.py が公開物の index.html にこの文があることを確かめる。 */
+#status-fanwork {
+	position: absolute;
+	top: calc(0.8rem + env(safe-area-inset-top, 0px));
+	left: calc(1rem + env(safe-area-inset-left, 0px));
+	right: calc(1rem + env(safe-area-inset-right, 0px));
+	color: #b9a7ae;
+	font-family: 'Noto Sans', 'Droid Sans', Arial, sans-serif;
+	font-size: 0.75rem;
+	line-height: 1.5;
+	text-align: center;
+	z-index: 1;
+}
+
 #status-notice {
 	background-color: #5b3943;
 	border-radius: 0.5rem;
@@ -254,6 +271,7 @@ body {
 		</noscript>
 
 		<div id="status">
+			<div id="status-fanwork">本作は上海アリス幻樂団の『東方Project』の二次創作であり、上海アリス幻樂団とは一切関係のない非公式のファンメイド作品です。</div>
 			<img id="status-splash" class="show-image--false fullsize--true use-filter--true" src="index.png" alt="">
 			<progress id="status-progress"></progress>
 			<div id="status-loading-note">読み込み中です。初回は数十秒〜数分かかります。</div>
@@ -266,7 +284,7 @@ body {
 
 		<script src="index.js"></script>
 		<script>
-const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":31661732,"index.wasm":1508095},"focusCanvas":true,"gdextensionLibs":["touhotato_native.web.template_release.wasm32.nothreads.wasm"],"godotPoolSize":4};
+const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":36730844,"index.wasm":1508095},"focusCanvas":true,"gdextensionLibs":["touhotato_native.web.template_release.wasm32.nothreads.wasm"],"godotPoolSize":4};
 const GODOT_THREADS_ENABLED = false;
 
 (function () {
